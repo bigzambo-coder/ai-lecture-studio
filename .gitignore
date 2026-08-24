@@ -1,0 +1,22 @@
+# dependencies
+node_modules/
+
+# Next.js build output
+.next/
+out/
+
+# generated user artifacts and temporary files
+storage/
+tmp/
+*.log
+*.tsbuildinfo
+
+# secrets and local environment
+.env
+.env.local
+.env.*.local
+
+# editor / OS
+.DS_Store
+Thumbs.db
+.vercel/
