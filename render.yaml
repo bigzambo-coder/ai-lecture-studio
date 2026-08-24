@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: ai-lecture-slide-master
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    plan: starter
+    healthCheckPath: /health
+    envVars:
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: BACKEND_API_TOKEN
+        generateValue: true
+      - key: JOB_DATA_ROOT
+        value: /data/jobs
+    disk:
+      name: slide-master-jobs
+      mountPath: /data
+      sizeGB: 10
+

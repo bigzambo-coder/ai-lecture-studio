@@ -220,6 +220,23 @@ export default function Home() {
     if (!active) throw new Error("프로젝트를 찾을 수 없습니다.");
     const stage=active.stages.find((s)=>s.key===key);
     const version=(stage?.version ?? 0)+1;
+    if(key==="ppt"){
+      const start=await fetch("/api/slide-master",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({projectId:active.id,projectTitle:active.title,brief:active.brief})});
+      if(start.ok){
+        const queued=await start.json();let job=queued;
+        for(let attempt=0;attempt<180&&!["complete","failed"].includes(job.status);attempt++){
+          await new Promise(resolve=>setTimeout(resolve,5000));
+          const check=await fetch(`/api/slide-master?id=${encodeURIComponent(queued.id)}`,{cache:"no-store"});
+          if(!check.ok)throw new Error("Slide Master 작업 상태를 확인하지 못했습니다.");
+          job=await check.json();
+        }
+        if(job.status!=="complete")throw new Error(job.error||"Slide Master 제작 시간이 초과되었습니다.");
+        const artifact:ArtifactRecord={id:crypto.randomUUID(),stageKey:key,version,filename:`${active.title}_Slide_Master_v${version}.pptx`,format:"pptx",downloadUrl:`/api/slide-master?id=${encodeURIComponent(job.id)}&download=1`,preview:["GitHub Slide Master 에이전트 파이프라인 적용","SVG→편집 가능한 PPTX 변환 완료","전체 렌더링 및 verify_deck 검수 완료"],createdAt:new Date().toISOString(),aiGenerated:true,engineVersion:100};
+        patchActive((p)=>({...p,artifacts:[...(p.artifacts??[]),artifact],updatedAt:new Date().toISOString(),stages:p.stages.map(s=>s.key===key?{...s,status:"awaiting_approval",version}:s)}));
+        return;
+      }
+      if(start.status!==503){const issue=await start.json();throw new Error(issue.error||"Slide Master 작업을 시작하지 못했습니다.")}
+    }
     const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({projectId:active.id,projectTitle:active.title,stage:key,version,brief:active.brief,deliverables:active.deliverables,artifacts:active.artifacts??[]})});
     const result=await response.json();
     if(!response.ok) throw new Error(result.error||"결과물 생성에 실패했습니다.");
