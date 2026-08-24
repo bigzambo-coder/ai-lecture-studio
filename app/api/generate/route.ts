@@ -218,13 +218,9 @@ export async function POST(request:NextRequest){
     if(!projectId||!stage||!brief) return NextResponse.json({error:"생성 입력이 부족합니다."},{status:400});
 
     const {content,ai}=await createContent(brief,stage);
-    if(stage==="notion"){
-      if(!brief.notionUrl) return NextResponse.json({error:"연결할 Notion 워크북 URL을 입력해주세요."},{status:400});
-      return NextResponse.json({artifact:{id:crypto.randomUUID(),stageKey:stage,version,filename:`${brief.institutionName||projectTitle} · ${brief.topic} Notion 워크북`,format:"notion",downloadUrl:brief.notionUrl,preview:["실제 Notion 워크북 연결 완료","PPT 실습 번호와 PRACTICE ID 연결","참여자에게 공유 가능한 페이지"],createdAt:new Date().toISOString(),aiGenerated:ai,engineVersion:12}});
-    }
     let buffer:Buffer;let format:string;
-    if(stage==="ppt"){buffer=await buildPptx(content,brief);format="pptx"}else if(["architecture","design","final_qa"].includes(stage)){buffer=Buffer.from(buildResultMarkdown(stage,content,brief),"utf8");format="md"}else if(stage==="plan"){buffer=await buildTemplatePlanDocx(content,brief);format="docx"}else if(stage==="proposal"){buffer=await buildProposalDocx(content,brief);format="docx"}else if(stage==="curriculum"){buffer=await buildCurriculumDocx(content,brief);format="docx"}else{buffer=await buildDocx(content,brief);format="docx"}
-    const date=new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Seoul"}).replace(/-/g,"");const plan=classifyPlan(brief.institutionType,brief.audience,brief.topic,brief.purpose,brief.planType);const filename=stage==="plan"?`${safe(brief.institutionName||brief.institutionType)}_${safe(brief.topic)}_${safe(plan.document)}_${date}${version>1?`_v${version}`:""}.${format}`:`${safe(projectTitle)}_${safe(content.title)}_v${version}.${format}`;
+    if(stage==="ppt"){buffer=await buildPptx(content,brief);format="pptx"}else if(stage==="notion"){buffer=Buffer.from(buildNotionMarkdown(content,brief),"utf8");format="md"}else if(["architecture","design","final_qa"].includes(stage)){buffer=Buffer.from(buildResultMarkdown(stage,content,brief),"utf8");format="md"}else if(stage==="plan"){buffer=await buildTemplatePlanDocx(content,brief);format="docx"}else if(stage==="proposal"){buffer=await buildProposalDocx(content,brief);format="docx"}else if(stage==="curriculum"){buffer=await buildCurriculumDocx(content,brief);format="docx"}else{buffer=await buildDocx(content,brief);format="docx"}
+    const date=new Date().toLocaleDateString("sv-SE",{timeZone:"Asia/Seoul"}).replace(/-/g,"");const plan=classifyPlan(brief.institutionType,brief.audience,brief.topic,brief.purpose,brief.planType);const filename=stage==="plan"?`${safe(brief.institutionName||brief.institutionType)}_${safe(brief.topic)}_${safe(plan.document)}_${date}${version>1?`_v${version}`:""}.${format}`:stage==="notion"?`${safe(projectTitle)}_${safe(brief.topic)}_Notion_실습워크북_v${version}.${format}`:`${safe(projectTitle)}_${safe(content.title)}_v${version}.${format}`;
     let downloadUrl:string;
     if(process.env.VERCEL){
       const mime={docx:"application/vnd.openxmlformats-officedocument.wordprocessingml.document",pptx:"application/vnd.openxmlformats-officedocument.presentationml.presentation",md:"text/markdown;charset=utf-8"}[format]||"application/octet-stream";
@@ -232,6 +228,6 @@ export async function POST(request:NextRequest){
     }else{
       const dir=path.join(process.cwd(),"storage",safe(projectId));await mkdir(dir,{recursive:true});await writeFile(path.join(dir,filename),buffer);downloadUrl=`/api/files?project=${encodeURIComponent(projectId)}&file=${encodeURIComponent(filename)}`;
     }
-    const preview=[`기획서 유형: ${plan.key} · ${plan.name}`,`디자인: ${resolveDesign(brief.designPreset,brief.institutionType,brief.audience,brief.topic).name}`,content.summary];return NextResponse.json({artifact:{id:crypto.randomUUID(),stageKey:stage,version,filename,format,downloadUrl,preview,createdAt:new Date().toISOString(),aiGenerated:ai,engineVersion:14}});
+    const preview=stage==="notion"?["PPT 실습과 동일한 PRACTICE ID 적용","실습별 준비자료·프롬프트·완료기준·검수 체크 포함",brief.notionUrl?"지정한 Notion 페이지와 연결 준비 완료":"워크북 파일 생성 완료"]:[`기획서 유형: ${plan.key} · ${plan.name}`,`디자인: ${resolveDesign(brief.designPreset,brief.institutionType,brief.audience,brief.topic).name}`,content.summary];return NextResponse.json({artifact:{id:crypto.randomUUID(),stageKey:stage,version,filename,format,downloadUrl,notionUrl:stage==="notion"?brief.notionUrl:undefined,preview,createdAt:new Date().toISOString(),aiGenerated:ai,engineVersion:15}});
   }catch(error){console.error(error);return NextResponse.json({error:error instanceof Error?error.message:"결과물 생성 중 오류가 발생했습니다."},{status:500})}
 }
