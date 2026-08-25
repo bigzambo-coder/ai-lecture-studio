@@ -245,7 +245,7 @@ export default function Home() {
         patchActive((p)=>({...p,artifacts:[...(p.artifacts??[]),artifact],updatedAt:new Date().toISOString(),stages:p.stages.map(s=>s.key===key?{...s,status:"awaiting_approval",version}:s)}));
         return;
       }
-      if(start.status!==503){const issue=await start.json();throw new Error(issue.error||"Slide Master 작업을 시작하지 못했습니다.")}
+      if(start.status!==503){const issue=await start.json();throw new Error(issue.error||"PPT 제작 요청을 확인하지 못했습니다. 입력 내용을 확인해주세요.")}
     }
     const response=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({projectId:active.id,projectTitle:active.title,stage:key,version,brief:active.brief,deliverables:active.deliverables,artifacts:active.artifacts??[]})});
     const result=await response.json();

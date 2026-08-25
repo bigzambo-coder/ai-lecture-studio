@@ -15,11 +15,14 @@ export async function POST(request: NextRequest) {
   if (!backend) return NextResponse.json({ error: "Slide Master 백엔드가 아직 연결되지 않았습니다." }, { status: 503 });
   const body = await request.json();
   const brief = body.brief ?? {};
+  const rawTitle = String(body.projectTitle ?? "").trim();
+  const topic = String(brief.topic ?? "").trim();
+  const projectTitle = rawTitle.length >= 2 ? rawTitle : `${topic.length >= 2 ? topic : "새 강의"} 교육`;
   const response = await fetch(`${backend.url}/v1/decks`, {
     method: "POST",
     headers: { ...backend.headers, "Content-Type": "application/json" },
     body: JSON.stringify({
-      project_title: body.projectTitle,
+      project_title: projectTitle,
       institution_name: brief.institutionName,
       institution_type: brief.institutionType,
       audience: brief.audience,
@@ -33,7 +36,12 @@ export async function POST(request: NextRequest) {
       notion_url: brief.notionUrl,
     }),
   });
-  return NextResponse.json(await response.json(), { status: response.status });
+  const result = await response.json();
+  if (!response.ok && response.status === 422) {
+    const fields = Array.isArray(result.detail) ? result.detail.map((item: { loc?: string[] }) => item.loc?.at(-1)).filter(Boolean) : [];
+    return NextResponse.json({ error: `PPT 생성에 필요한 입력을 확인해주세요${fields.length ? `: ${fields.join(", ")}` : "."}` }, { status: 422 });
+  }
+  return NextResponse.json(result, { status: response.status });
 }
 
 export async function GET(request: NextRequest) {
