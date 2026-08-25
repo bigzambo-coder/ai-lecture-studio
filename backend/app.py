@@ -119,7 +119,7 @@ async def run_job(job_id: str, req: DeckRequest) -> None:
         save_job(job)
         env = os.environ.copy()
         process = await asyncio.create_subprocess_exec(
-            CODEX_BIN, "exec", "--full-auto",
+            CODEX_BIN, "exec", "--sandbox", "workspace-write",
             "-C", str(ROOT), prompt_for(req, project),
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=env,
         )
