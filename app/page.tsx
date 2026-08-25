@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { designSystems, recommendDesign } from "./design-system";
+import { recommendDesign, recommendDesignOptions, resolveDesign, type DesignSystem } from "./design-system";
 import { classifyPlan, planTypes } from "./plan-system";
 
 type DeliverableKey = "plan" | "proposal" | "curriculum" | "ppt" | "notion" | "script";
@@ -29,6 +29,7 @@ type MasterBrief = {
   designRequest: string;
   designReferenceUrl: string;
   designPreset: string;
+  designLocked: boolean;
   notionUrl: string;
   deadline: string;
   location: string;
@@ -94,7 +95,7 @@ const emptyBrief: MasterBrief = {
   institutionName: "", institutionType: "", department:"", planType:"auto", audience: "", audienceLevel: "", audienceCount: "",
   topic: "", problem: "", purpose: "", objectives: [], totalMinutes: "", sessions: "1",
   deliveryMethod: "강의 + 따라하기 실습", practiceRatio: "50", devices: "", accountEnvironment: "",
-  designRequest: "", designReferenceUrl:"", designPreset:"auto", notionUrl:DEFAULT_NOTION_URL, deadline: "", location:"", budget:"", finalDeliverable:"",
+  designRequest: "", designReferenceUrl:"", designPreset:"auto", designLocked:false, notionUrl:DEFAULT_NOTION_URL, deadline: "", location:"", budget:"", finalDeliverable:"",
 };
 
 const interviewQuestions = [
@@ -138,8 +139,9 @@ export default function Home() {
       const parsed=(JSON.parse(saved) as Project[]).map((project)=>{
         const artifacts=project.artifacts??[];
         const savedBrief={...project.brief,notionUrl:(!project.brief.notionUrl||project.brief.notionUrl.includes("eb2c089c67df4ba8adfb8c869f74fdb5")||project.brief.notionUrl.includes("3c56eecc5c4d8055b090f160a49fad7d"))?DEFAULT_NOTION_URL:project.brief.notionUrl};
-        const currentDesign=recommendDesign(savedBrief.institutionType,savedBrief.audience,savedBrief.topic);
-        const brief={...savedBrief,designPreset:currentDesign.key,designRequest:`${currentDesign.name} · ${currentDesign.description}`};
+        const locked=Boolean(savedBrief.designLocked&&savedBrief.designPreset&&savedBrief.designPreset!=="auto");
+        const currentDesign=locked?resolveDesign(savedBrief.designPreset,savedBrief.institutionType,savedBrief.audience,savedBrief.topic):recommendDesign(savedBrief.institutionType,savedBrief.audience,savedBrief.topic);
+        const brief={...savedBrief,designLocked:locked,designPreset:currentDesign.key,designRequest:savedBrief.designRequest||`${currentDesign.name} · ${currentDesign.description}`};
         const visibleStages=project.stages.map(stage=>["architecture","design","final_qa"].includes(stage.key)?{...stage,selected:false}:stage);
         const visibleCurrent=visibleStages.find(stage=>stage.selected&&stage.status!=="approved")?.key??visibleStages.filter(stage=>stage.selected).at(-1)?.key??"master_brief";
         if(artifacts.length>0&&artifacts.every((artifact)=>(artifact.engineVersion??0)>=10))return {...project,brief,artifacts,stages:visibleStages,currentStage:visibleStages.some(stage=>stage.key===project.currentStage&&stage.selected)?project.currentStage:visibleCurrent};
@@ -183,7 +185,7 @@ export default function Home() {
       `AI 도구를 활용하여 ${result}에 필요한 결과물 한 가지를 완성할 수 있다.`,
       "완성한 결과물을 점검하고 자신의 상황에 맞게 수정할 수 있다.",
     ];
-    const interviewDesign=recommendDesign(active.brief.institutionType,active.brief.audience,active.brief.topic);
+    const interviewDesign=active.brief.designLocked?resolveDesign(active.brief.designPreset,active.brief.institutionType,active.brief.audience,active.brief.topic):recommendDesign(active.brief.institutionType,active.brief.audience,active.brief.topic);
     patchActive((p) => ({ ...p, updatedAt: new Date().toISOString(), interviewAnswers: answers, brief: {
       ...p.brief,
       audienceLevel: answers.level ?? p.brief.audienceLevel,
@@ -302,7 +304,8 @@ function Dashboard({ projects, onCreate, onOpen }: { projects: Project[]; onCrea
 function CreateProject({ draft, setDraft, selected, toggle, onNext }: { draft: MasterBrief; setDraft: (b: MasterBrief) => void; selected: DeliverableKey[]; toggle: (k: DeliverableKey) => void; onNext: () => void }) {
   const [step,setStep]=useState(0);
   const field = (key: keyof MasterBrief, value: string) => setDraft({ ...draft, [key]: value });
-  const recommended=recommendDesign(draft.institutionType,draft.audience,draft.topic);
+  const recommendations=recommendDesignOptions(draft.institutionType,draft.audience,draft.topic);
+  const selectDesign=(design:DesignSystem)=>setDraft({...draft,designPreset:design.key,designLocked:true,designRequest:`${design.name} · ${design.description}`,designReferenceUrl:"https://www.oppadu.com/tools/design-systems-site/#/"});
   const recommendedPlan=classifyPlan(draft.institutionType,draft.audience,draft.topic,draft.purpose,draft.planType);
   const titles=["기관과 교육","기획서와 운영","PPT 디자인","결과물과 Notion"];
   const valid=[Boolean(draft.institutionType&&draft.audience&&draft.topic&&draft.totalMinutes),true,true,selected.length>0][step];
@@ -310,7 +313,7 @@ function CreateProject({ draft, setDraft, selected, toggle, onNext }: { draft: M
     <div className="wizard-card">
       {step===0&&<div className="form-grid"><label>기관명<input value={draft.institutionName} onChange={e=>field("institutionName",e.target.value)} placeholder="예: 부산시설공단"/></label><label>기관 유형<select value={draft.institutionType} onChange={e=>field("institutionType",e.target.value)}><option value="">선택해주세요</option><option>공공기관</option><option>공기업</option><option>일반기업</option><option>학교·교육기관</option><option>복지기관</option><option>청년·창업기관</option><option>소상공인 지원기관</option></select></label><label>교육 대상<input value={draft.audience} onChange={e=>field("audience",e.target.value)} placeholder="예: 청년 소상공인"/></label><label>인원<input value={draft.audienceCount} onChange={e=>field("audienceCount",e.target.value)} placeholder="예: 25명"/></label><label className="wide">교육 주제<input value={draft.topic} onChange={e=>field("topic",e.target.value)} placeholder="예: 생성형 AI를 활용한 업무효율화"/></label><label>총 교육시간<input value={draft.totalMinutes} onChange={e=>field("totalMinutes",e.target.value)} placeholder="예: 180분"/></label><label>차시<input value={draft.sessions} onChange={e=>field("sessions",e.target.value)} placeholder="예: 1"/></label><label className="wide">교육 목적<textarea value={draft.purpose} onChange={e=>field("purpose",e.target.value)} placeholder="교육 후 참여자가 어떻게 달라질지 적어주세요."/></label></div>}
       {step===1&&<><div className="plan-recommend"><span>AUTO CLASSIFICATION</span><b>{recommendedPlan.key} · {recommendedPlan.name}</b><p>{recommendedPlan.document} · {recommendedPlan.focus}</p></div><div className="form-grid"><label>담당부서<input value={draft.department} onChange={e=>field("department",e.target.value)} placeholder="미정이면 비워두세요"/></label><label>기획서 유형<select value={draft.planType} onChange={e=>field("planType",e.target.value)}><option value="auto">자동 판별</option>{planTypes.map(t=><option key={t.key} value={t.key}>{t.key} · {t.name}</option>)}</select></label><label>교육 장소·환경<input value={draft.location} onChange={e=>field("location",e.target.value)} placeholder="예: 전산교육장 / 노트북 / Wi-Fi"/></label><label>예산<input value={draft.budget} onChange={e=>field("budget",e.target.value)} placeholder="미정이면 비워두세요"/></label><label className="wide">참여자 최종 결과물<input value={draft.finalDeliverable} onChange={e=>field("finalDeliverable",e.target.value)} placeholder="예: 회사소개서·제안서·카드뉴스"/></label></div></>}
-      {step===2&&<><p className="hint">기관의 공식성과 대상의 연령·직업 특성을 함께 분석해 전문 디자인을 추천합니다.</p><div className="design-recommend"><div><span>AUTO RECOMMEND</span><b>{recommended.name}</b><p>{recommended.fit}에 맞춘 정보 위계와 시각 문법을 적용합니다.</p></div><button type="button" onClick={()=>field("designPreset",recommended.key)}>추천안 적용</button></div><div className="template-grid compact-templates">{designSystems.map(p=><button type="button" key={p.key} className={`template-card ${draft.designPreset===p.key?"selected":""}`} onClick={()=>field("designPreset",p.key)}><div className="reference-thumb" style={{backgroundImage:`linear-gradient(180deg,transparent 35%,rgba(0,0,0,.72)),url(${p.preview})`}}><em>REF {p.references.join(" · ")}</em></div><div><b>{p.name}</b><small>{p.description}</small><mark>{p.fit}</mark></div></button>)}</div></>}
+      {step===2&&<><div className="design-source"><div><span>DESIGN SYSTEM GALLERY</span><b>기관·대상·주제에 맞는 3가지 방향을 골랐습니다.</b><p>242개 디자인 시스템의 지역·색상·산업·폰트 분류 방식을 추천 기준에 반영했습니다.</p></div><a href="https://www.oppadu.com/tools/design-systems-site/#/" target="_blank" rel="noreferrer">참고 사이트 ↗</a></div><div className="design-options">{recommendations.map((p,i)=><button type="button" key={p.key} className={`design-option ${draft.designPreset===p.key?"selected":""}`} onClick={()=>selectDesign(p)}><div className="design-option-image" style={{backgroundImage:`linear-gradient(180deg,transparent 42%,rgba(5,13,12,.8)),url(${p.preview})`}}><span>추천 {i+1}</span><em>{p.tags?.join(" · ")}</em></div><div className="design-option-body"><div><b>{p.name}</b>{draft.designPreset===p.key&&<i>선택됨</i>}</div><p>{p.description}</p><small>무드 참고 · {p.inspiredBy?.join(" / ")}</small><div className="palette-row">{Object.values(p.colors).slice(0,5).map((color,j)=><span key={j} style={{background:`#${color}`}}/>)}<mark>{p.fit}</mark></div></div></button>)}</div><label className="design-note">추가 디자인 요청<textarea value={draft.designRequest} onChange={e=>field("designRequest",e.target.value)} placeholder="예: 기관 로고 컬러는 유지하고 사진 비중을 높여주세요."/></label><p className="design-legal">브랜드 화면을 복제하지 않고, 공개된 디자인 시스템의 분류와 시각 원칙만 참고해 독자적인 PPT로 제작합니다.</p></>}
       {step===3&&<><div className="deliverable-grid">{deliverableOptions.map(o=><button key={o.key} type="button" className={selected.includes(o.key)?"deliverable selected":"deliverable"} onClick={()=>toggle(o.key)}><span>{o.icon}</span><div><b>{o.title}</b><small>{o.description}</small></div><i>{selected.includes(o.key)?"✓":"＋"}</i></button>)}</div>{selected.includes("notion")&&<label className="notion-field">Notion 워크북 페이지 URL<input value={draft.notionUrl} onChange={e=>field("notionUrl",e.target.value)} placeholder="편집 가능한 빈 Notion 페이지 주소"/><small>PPT의 PRACTICE ID와 같은 실습 워크북이 자동 생성됩니다.</small></label>}</>}
     </div><div className="wizard-actions"><button className="secondary" disabled={step===0} onClick={()=>setStep(step-1)}>← 이전</button><span>{step+1} / 4</span>{step<3?<button className="primary" disabled={!valid} onClick={()=>setStep(step+1)}>다음 →</button>:<button className="primary" disabled={!valid} onClick={onNext}>입력 완료 →</button>}</div>
   </div>;
@@ -322,8 +325,8 @@ function Interview({ project, answers, setAnswers, onBack, onComplete }: { proje
 
 function Brief({ project, onChange, onApprove }: { project: Project; objectiveText: string; setObjectiveText:(s:string)=>void; onChange:(b:MasterBrief)=>void; onApprove:()=>void }) {
   const b=project.brief;
-  const recommended=recommendDesign(b.institutionType,b.audience,b.topic);
-  const change=(key:keyof MasterBrief,value:string|string[])=>{const next={...b,[key]:value};if(["institutionName","institutionType","audience","topic"].includes(key)){const design=recommendDesign(next.institutionType,next.audience,next.topic);next.designPreset=design.key;next.designRequest=`${design.name} · ${design.description}`;}onChange(next)};
+  const recommended=resolveDesign(b.designPreset,b.institutionType,b.audience,b.topic);
+  const change=(key:keyof MasterBrief,value:string|string[])=>{const next={...b,[key]:value};if(!next.designLocked&&["institutionName","institutionType","audience","topic"].includes(key)){const design=recommendDesign(next.institutionType,next.audience,next.topic);next.designPreset=design.key;next.designRequest=`${design.name} · ${design.description}`;}onChange(next)};
   const warnings=[!b.institutionName&&"기관명이 아직 정해지지 않았습니다.",!b.totalMinutes&&"총 교육시간을 입력해주세요.",!b.devices&&"참여자 기기 환경을 확인하면 실습 설계가 더 정확해집니다."].filter(Boolean);
   return <div className="page brief-page"><div className="compact-header"><div><span className="eyebrow">MASTER BRIEF</span><h1>제작의 기준정보를 확인해주세요.</h1><p>확정하면 현재 내용을 변경할 수 없는 승인 버전으로 보관합니다.</p></div><div className="brief-status"><span>승인 전</span><b>검토가 필요합니다</b></div></div>{warnings.length>0&&<div className="warning-box"><b>확인할 내용 {warnings.length}개</b>{warnings.map(w=><span key={String(w)}>· {w}</span>)}</div>}<div className="brief-grid"><section><header><span>01</span><h2>기관과 대상</h2></header><label>기관명<input value={b.institutionName} onChange={e=>change("institutionName",e.target.value)}/></label><label>기관 유형<input value={b.institutionType} onChange={e=>change("institutionType",e.target.value)}/></label><label>대상<input value={b.audience} onChange={e=>change("audience",e.target.value)}/></label><label>수준<input value={b.audienceLevel} onChange={e=>change("audienceLevel",e.target.value)}/></label></section><section><header><span>02</span><h2>교육 설계</h2></header><label>강의 주제<input value={b.topic} onChange={e=>change("topic",e.target.value)}/></label><label>교육 목적<textarea value={b.purpose} onChange={e=>change("purpose",e.target.value)}/></label><label>총시간<input value={b.totalMinutes} onChange={e=>change("totalMinutes",e.target.value)}/></label><label>진행방식<input value={b.deliveryMethod} onChange={e=>change("deliveryMethod",e.target.value)}/></label></section><section className="span-two"><header><span>03</span><h2>행동형 교육목표</h2></header><div className="objective-list">{b.objectives.map((o,i)=><div key={i}><b>{String(i+1).padStart(2,"0")}</b><textarea value={o} onChange={e=>change("objectives",b.objectives.map((x,j)=>j===i?e.target.value:x))}/><button onClick={()=>change("objectives",b.objectives.filter((_,j)=>j!==i))}>×</button></div>)}<button className="add-row" onClick={()=>change("objectives",[...b.objectives,"새로운 행동형 목표를 입력하세요."])}>＋ 교육목표 추가</button></div></section><section><header><span>04</span><h2>환경과 안전</h2></header><label>기기 환경<input value={b.devices} onChange={e=>change("devices",e.target.value)} placeholder="예: 개인 스마트폰"/></label><label>계정·인터넷<input value={b.accountEnvironment} onChange={e=>change("accountEnvironment",e.target.value)} placeholder="예: 무료 Google 계정"/></label></section><section><header><span>05</span><h2>디자인 방향</h2></header><label>자동 생성된 디자인 콘셉트<textarea value={b.designRequest} onChange={e=>change("designRequest",e.target.value)}/></label><div className="design-preview"><span/><div><b>{recommended.name}</b><small>{recommended.description}</small></div></div></section></div><div className="form-actions sticky"><span>확정 후 수정하면 하위 단계가 재검토 상태로 전환됩니다.</span><button className="secondary">수정 내용 저장</button><button className="primary" disabled={!b.topic||!b.audience||!b.totalMinutes} onClick={onApprove}>확정하고 제작 스튜디오 열기 →</button></div></div>;
 }

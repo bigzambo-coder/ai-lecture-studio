@@ -7,6 +7,8 @@ export type DesignSystem = {
   preview: string;
   colors: { bg:string; ink:string; primary:string; accent:string; soft:string; muted:string };
   mode: "civic"|"public"|"corporate"|"youth"|"tech"|"warm"|"editorial";
+  inspiredBy?: string[];
+  tags?: string[];
 };
 
 export const designSystems: DesignSystem[] = [
@@ -17,19 +19,31 @@ export const designSystems: DesignSystem[] = [
   {key:"tech_neon",name:"Tech Neon Grid",description:"딥 네이비 바탕, 발광 포인트, 시스템·네트워크 도식",fit:"IT·AI·개발·스타트업",references:[4,9,11,13,16,17],preview:"/design-references/ref-17.png",mode:"tech",colors:{bg:"0B1020",ink:"F5F7FF",primary:"7857FF",accent:"31E6C5",soft:"192747",muted:"A9B5CF"}},
   {key:"warm_lifestyle",name:"Warm Lifestyle",description:"따뜻한 사진, 둥근 형태, 부담 없는 단계형 안내",fit:"부모·엄마·시니어·복지",references:[2,4,10,11,16],preview:"/design-references/ref-10.png",mode:"warm",colors:{bg:"FFF8EF",ink:"4B342E",primary:"D9666F",accent:"F0B84B",soft:"F7DED6",muted:"806B64"}},
   {key:"premium_editorial",name:"Premium Editorial",description:"흑백 사진, 세리프 포인트, 절제된 컬러와 과감한 크롭",fit:"브랜드·리더십·프리미엄 과정",references:[7,8,10,11,14],preview:"/design-references/ref-11.png",mode:"editorial",colors:{bg:"F2EFE8",ink:"111111",primary:"C8482E",accent:"E8C96A",soft:"DED8CD",muted:"6B6964"}},
+  {key:"korea_clear_service",name:"Clear Korean Service",description:"짧은 문장, 선명한 숫자, 넉넉한 여백으로 복잡한 정보를 쉽게 전달하는 한국형 서비스 디자인",fit:"공공서비스·금융교육·디지털 안내",references:[3,6,14,17],preview:"/design-references/ref-6.png",mode:"public",inspiredBy:["Toss","KakaoBank","NAVER Pay"],tags:["한국","라이트","쿨","핀테크"],colors:{bg:"F7FAFC",ink:"17212B",primary:"1769E0",accent:"18A999",soft:"E8F1FB",muted:"617184"}},
+  {key:"fluent_enterprise",name:"Fluent Enterprise",description:"카드형 정보 구조와 정교한 그리드로 보고·교육·실행 항목을 빠르게 구분하는 엔터프라이즈 스타일",fit:"기업·공기업·관리자·B2B 교육",references:[2,5,8,15],preview:"/design-references/ref-15.png",mode:"corporate",inspiredBy:["Microsoft Fluent","Atlassian","Ant Design"],tags:["글로벌","라이트","뉴트럴","엔터프라이즈"],colors:{bg:"F6F7F9",ink:"18202A",primary:"3158D4",accent:"00A7A0",soft:"E6EAF5",muted:"66717E"}},
+  {key:"local_friendly",name:"Local Friendly Commerce",description:"생활 사진과 친근한 곡선, 따뜻한 포인트로 현장 사례와 실습을 부담 없이 안내하는 스타일",fit:"소상공인·지역상권·생활밀착 교육",references:[2,10,11,16],preview:"/design-references/ref-16.png",mode:"warm",inspiredBy:["Daangn","Baemin","Ohouse"],tags:["한국","라이트","웜","커머스"],colors:{bg:"FFF9F3",ink:"382F2A",primary:"E86F3A",accent:"12A594",soft:"F8E7D9",muted:"786A61"}},
+  {key:"ai_neural_gradient",name:"Neural AI Gradient",description:"깊이감 있는 그라디언트와 모듈형 다이어그램으로 AI 개념과 업무 흐름을 시각화하는 스타일",fit:"생성형 AI·테크·청년·혁신교육",references:[4,9,13,17],preview:"/design-references/ref-13.png",mode:"tech",inspiredBy:["Gemini","Figma","Microsoft Copilot"],tags:["글로벌","다크","쿨","AI"],colors:{bg:"101426",ink:"F5F7FF",primary:"7857FF",accent:"37D6C1",soft:"202B4A",muted:"ADB6D0"}},
+  {key:"calm_workspace",name:"Calm Knowledge Workspace",description:"차분한 종이 질감과 문서형 레이아웃으로 학습 단계와 워크북 연결을 자연스럽게 보여주는 스타일",fit:"교육기관·부모·입문자·워크숍",references:[1,7,10,12],preview:"/design-references/ref-7.png",mode:"editorial",inspiredBy:["Notion","Claude","Coda"],tags:["글로벌","라이트","뉴트럴","생산성"],colors:{bg:"FAF8F4",ink:"25231F",primary:"5A5B73",accent:"D17755",soft:"EDE8DF",muted:"77736C"}},
 ];
 
-export function recommendDesign(institutionType="", audience="", topic="") {
+export function recommendDesignOptions(institutionType="", audience="", topic="") {
   const text=`${institutionType} ${audience} ${topic}`.toLowerCase();
+  const keys:string[]=[];
+  const add=(...items:string[])=>items.forEach(key=>{if(!keys.includes(key))keys.push(key)});
   const isPublic=/공공|공기업|교육기관|재단|공단|정부|지자체|지원기관/.test(text);
-  const isYouthBusiness=/청년|20대|대학생|창업|소상공인|자영업/.test(text);
-  if(isPublic&&isYouthBusiness) return designSystems.find(x=>x.key==="public_youth_editorial")!;
-  if(/엄마|부모|시니어|노인|복지|육아|가족/.test(text)) return designSystems.find(x=>x.key==="warm_lifestyle")!;
-  if(/개발|it|ai|인공지능|데이터|테크|스타트업/.test(text) && !/공공|공기업/.test(text)) return designSystems.find(x=>x.key==="tech_neon")!;
-  if(isPublic) return designSystems.find(x=>x.key==="public_data")!;
-  if(isYouthBusiness) return designSystems.find(x=>x.key==="youth_pop")!;
-  if(/브랜드|리더|임원|프리미엄|문화|예술/.test(text)) return designSystems.find(x=>x.key==="premium_editorial")!;
-  return designSystems.find(x=>x.key==="corporate_strategy")!;
+  const isYouth=/청년|20대|대학생|창업|소상공인|자영업/.test(text);
+  if(isPublic&&isYouth)add("public_youth_editorial","korea_clear_service",/ai|인공지능|생성형/.test(text)?"ai_neural_gradient":"local_friendly");
+  else if(/엄마|부모|시니어|노인|복지|육아|가족/.test(text))add("calm_workspace","warm_lifestyle","korea_clear_service");
+  else if(/개발|it|ai|인공지능|데이터|테크|스타트업/.test(text))add("ai_neural_gradient",isPublic?"public_data":"tech_neon","fluent_enterprise");
+  else if(isPublic)add("korea_clear_service","public_data","fluent_enterprise");
+  else if(isYouth)add("local_friendly","youth_pop","ai_neural_gradient");
+  else if(/브랜드|리더|임원|프리미엄|문화|예술/.test(text))add("premium_editorial","fluent_enterprise","calm_workspace");
+  else add("fluent_enterprise","corporate_strategy","calm_workspace");
+  return keys.slice(0,3).map(key=>designSystems.find(item=>item.key===key)!);
+}
+
+export function recommendDesign(institutionType="", audience="", topic="") {
+  return recommendDesignOptions(institutionType,audience,topic)[0];
 }
 
 export function resolveDesign(key:string|undefined,institutionType="",audience="",topic="") {
