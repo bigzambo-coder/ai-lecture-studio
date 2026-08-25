@@ -255,7 +255,7 @@ export default function Home() {
           <button className={view === "dashboard" ? "active" : ""} onClick={() => setView("dashboard")}><span>⌂</span> 프로젝트</button>
           <button onClick={beginCreate}><span>＋</span> 새 강의 만들기</button>
           <button><span>◇</span> 템플릿</button>
-          <button><span>⚙</span> 설정</button>
+          <button onClick={() => { window.location.href = "/admin"; }}><span>⚙</span> 관리자</button>
         </nav>
         <div className="sidebar-note"><b>제작 원칙</b><p>승인된 단계만 다음 결과물의 입력으로 사용합니다.</p></div>
         <div className="profile"><span>문</span><div><b>문정수 강사</b><small>한국AI콘텐츠연구원</small></div></div>

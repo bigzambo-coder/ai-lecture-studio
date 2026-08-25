@@ -168,6 +168,20 @@ def create_deck(req: DeckRequest, tasks: BackgroundTasks, authorization: str | N
     return job
 
 
+@app.get("/v1/decks", response_model=list[Job])
+def list_decks(authorization: str | None = Header(default=None)):
+    authorize(authorization)
+    jobs: list[Job] = []
+    if not DATA.exists():
+        return jobs
+    for path in DATA.glob("*/job.json"):
+        try:
+            jobs.append(Job.model_validate_json(path.read_text(encoding="utf-8")))
+        except Exception:
+            continue
+    return sorted(jobs, key=lambda item: item.created_at, reverse=True)[:100]
+
+
 @app.get("/v1/decks/{job_id}", response_model=Job)
 def get_deck(job_id: str, authorization: str | None = Header(default=None)):
     authorize(authorization)
