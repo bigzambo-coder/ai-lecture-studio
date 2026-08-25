@@ -119,14 +119,16 @@ async def run_job(job_id: str, req: DeckRequest) -> None:
         save_job(job)
         env = os.environ.copy()
         process = await asyncio.create_subprocess_exec(
-            CODEX_BIN, "exec", "--full-auto", "--sandbox", "workspace-write",
+            CODEX_BIN, "exec", "--full-auto",
             "-C", str(ROOT), prompt_for(req, project),
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.STDOUT, env=env,
         )
         output, _ = await process.communicate()
         (folder / "worker.log").write_bytes(output or b"")
         if process.returncode != 0:
-            raise RuntimeError(f"Codex 작업자가 종료 코드 {process.returncode}를 반환했습니다.")
+            tail = (output or b"").decode("utf-8", errors="replace")[-1800:]
+            tail = tail.replace(os.environ.get("OPENAI_API_KEY", "__NO_KEY__"), "[API KEY HIDDEN]")
+            raise RuntimeError(f"Codex 작업자가 종료 코드 {process.returncode}를 반환했습니다.\n{tail}")
         exports = sorted((project / "exports").glob("*.pptx"), key=lambda p: p.stat().st_mtime)
         if not exports:
             raise RuntimeError("Slide Master가 PPTX를 생성하지 못했습니다.")

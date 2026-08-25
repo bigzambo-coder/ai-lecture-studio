@@ -156,8 +156,19 @@ async function buildCompactPlanDocx(content:Content,brief:Brief){
 }
 
 function xmlEscape(value:string){return (value||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;")}
-function cellBody(lines:string[],bold=false){return lines.map((line,i)=>{const bullet=line.startsWith("•");return `<w:p><w:pPr><w:jc w:val="${bold?"center":"left"}"/><w:spacing w:before="${i?40:0}" w:after="${i===lines.length-1?0:80}" w:line="320" w:lineRule="auto"/>${bullet?'<w:ind w:left="220" w:hanging="160"/>':""}</w:pPr><w:r><w:rPr><w:rFonts w:ascii="Malgun Gothic" w:hAnsi="Malgun Gothic" w:eastAsia="Malgun Gothic"/><w:b w:val="${bold?1:0}"/><w:sz w:val="${bold?20:19}"/><w:szCs w:val="${bold?20:19}"/></w:rPr><w:t xml:space="preserve">${xmlEscape(line)}</w:t></w:r></w:p>`}).join("")}
-function replaceRowCells(row:string,values:(string|string[])[]){let i=0;return row.replace(/<w:tc\b[\s\S]*?<\/w:tc>/g,(cell)=>{const index=i;const value=values[i++];if(value===undefined)return cell;const open=cell.match(/^<w:tc\b[^>]*>/)?.[0]||"<w:tc>";let props=cell.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/)?.[0]||"";props=props.replace(/<w:tcMar>[\s\S]*?<\/w:tcMar>/,`<w:tcMar><w:top w:w="110" w:type="dxa"/><w:left w:w="130" w:type="dxa"/><w:bottom w:w="110" w:type="dxa"/><w:right w:w="130" w:type="dxa"/></w:tcMar>`);const lines=(Array.isArray(value)?value:[value]).filter(Boolean);const label=index===0&&lines.length===1&&lines[0].length<18;return `${open}${props}${cellBody(lines.length?lines:[""],label)}</w:tc>`})}
+function cellBody(lines:string[],bold=false,color="26322E"){return lines.map((line,i)=>{const bullet=line.startsWith("•");return `<w:p><w:pPr><w:jc w:val="${bold?"center":"left"}"/><w:spacing w:before="${i?40:0}" w:after="${i===lines.length-1?0:80}" w:line="320" w:lineRule="auto"/>${bullet?'<w:ind w:left="220" w:hanging="160"/>':""}</w:pPr><w:r><w:rPr><w:rFonts w:ascii="Malgun Gothic" w:hAnsi="Malgun Gothic" w:eastAsia="Malgun Gothic"/><w:color w:val="${color}"/><w:b w:val="${bold?1:0}"/><w:sz w:val="${bold?20:19}"/><w:szCs w:val="${bold?20:19}"/></w:rPr><w:t xml:space="preserve">${xmlEscape(line)}</w:t></w:r></w:p>`}).join("")}
+function replaceRowCells(row:string,values:(string|string[])[],header=false){let i=0;return row.replace(/<w:tc\b[\s\S]*?<\/w:tc>/g,(cell)=>{const index=i;const value=values[i++];if(value===undefined)return cell;const open=cell.match(/^<w:tc\b[^>]*>/)?.[0]||"<w:tc>";let props=cell.match(/<w:tcPr>[\s\S]*?<\/w:tcPr>/)?.[0]||"";props=props.replace(/<w:tcMar>[\s\S]*?<\/w:tcMar>/,`<w:tcMar><w:top w:w="110" w:type="dxa"/><w:left w:w="130" w:type="dxa"/><w:bottom w:w="110" w:type="dxa"/><w:right w:w="130" w:type="dxa"/></w:tcMar>`);const lines=(Array.isArray(value)?value:[value]).filter(Boolean);const label=(index===0&&lines.length===1&&lines[0].length<18)||header;return `${open}${props}${cellBody(lines.length?lines:[""],label,label?"FFFFFF":"26322E")}</w:tc>`})}
+
+function movePlanSections(xml:string){
+  const locate=(title:string,next:string)=>{const textAt=xml.indexOf(xmlEscape(title));const nextAt=xml.indexOf(xmlEscape(next),textAt+1);if(textAt<0||nextAt<0)return null;return {start:xml.lastIndexOf("<w:p",textAt),end:xml.lastIndexOf("<w:p",nextAt)};};
+  const need=locate("2. 교육 필요성 및 운영 방향","3. 세부 교육 커리큘럼");const curriculum=locate("3. 세부 교육 커리큘럼","4. 교육 목표");const goals=locate("4. 교육 목표","5. 수강생 최종 결과물");
+  if(!need||!curriculum||!goals)return xml;
+  const before=xml.slice(0,need.start);const after=xml.slice(goals.end);
+  const goalBlock=xml.slice(goals.start,goals.end).replace(xmlEscape("4. 교육 목표"),xmlEscape("2. 교육 목표"));
+  const needBlock=xml.slice(need.start,need.end).replace(xmlEscape("2. 교육 필요성 및 운영 방향"),xmlEscape("3. 교육 필요성"));
+  const curriculumBlock=xml.slice(curriculum.start,curriculum.end).replace(xmlEscape("3. 세부 교육 커리큘럼"),xmlEscape("4. 세부 교육 커리큘럼"));
+  return before+goalBlock+needBlock+curriculumBlock+after;
+}
 
 async function buildTemplatePlanDocx(content:Content,brief:Brief){
   const plan=classifyPlan(brief.institutionType,brief.audience,brief.topic,brief.purpose,brief.planType);
@@ -181,7 +192,8 @@ async function buildTemplatePlanDocx(content:Content,brief:Brief){
   const titleMap:[[string,string],[string,string],[string,string]]=[["청년 소상공인 AI 실무자동화 교육기획서",`${brief.audience||"교육 대상"} ${brief.topic||"생성형 AI 활용"} ${plan.document}`],["Gemini Canvas로 완성하는 실무문서 자동화",brief.topic||content.title],["사업정보 한 번 입력으로 회사소개서·제안서·SNS 카드뉴스 초안까지 완성",brief.purpose||content.summary]];
   titleMap.forEach(([oldText,newText])=>{xml=xml.replace(xmlEscape(oldText),xmlEscape(newText))});
   const xmlTables=xml.match(/<w:tbl\b[\s\S]*?<\/w:tbl>/g)||[];if(xmlTables.length!==9)throw new Error("상세 교육기획서 표 구조가 예상과 다릅니다.");
-  xmlTables.forEach((table,ti)=>{const rows=table.match(/<w:tr\b[\s\S]*?<\/w:tr>/g)||[];let next=table;rows.forEach((row,ri)=>{next=next.replace(row,replaceRowCells(row,tables[ti][ri]||[]))});xml=xml.replace(table,next)});
+  xmlTables.forEach((table,ti)=>{const rows=table.match(/<w:tr\b[\s\S]*?<\/w:tr>/g)||[];let next=table;rows.forEach((row,ri)=>{next=next.replace(row,replaceRowCells(row,tables[ti][ri]||[],ti>0&&ri===0))});xml=xml.replace(table,next)});
+  xml=movePlanSections(xml);
   zip.file("word/document.xml",xml);return zip.generateAsync({type:"nodebuffer",compression:"DEFLATE",compressionOptions:{level:6}}) as Promise<Buffer>;
 }
 
