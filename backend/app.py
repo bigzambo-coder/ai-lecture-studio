@@ -118,6 +118,11 @@ async def run_job(job_id: str, req: DeckRequest) -> None:
         job.progress = "Codex가 Slide Master 규칙으로 PPT 제작 중"
         save_job(job)
         env = os.environ.copy()
+        api_key = (env.get("CODEX_API_KEY") or env.get("OPENAI_API_KEY") or "").strip()
+        if not api_key:
+            raise RuntimeError("OpenAI 인증키가 백엔드에 연결되지 않았습니다. 관리자에게 문의해주세요.")
+        # Recent Codex CLI versions use CODEX_API_KEY for non-interactive `codex exec`.
+        env["CODEX_API_KEY"] = api_key
         process = await asyncio.create_subprocess_exec(
             CODEX_BIN, "exec", "--sandbox", "workspace-write",
             "-C", str(ROOT), prompt_for(req, project),
@@ -128,7 +133,11 @@ async def run_job(job_id: str, req: DeckRequest) -> None:
         if process.returncode != 0:
             tail = (output or b"").decode("utf-8", errors="replace")[-1800:]
             tail = tail.replace(os.environ.get("OPENAI_API_KEY", "__NO_KEY__"), "[API KEY HIDDEN]")
-            raise RuntimeError(f"Codex 작업자가 종료 코드 {process.returncode}를 반환했습니다.\n{tail}")
+            if "401" in tail or "Missing bearer" in tail or "Unauthorized" in tail:
+                raise RuntimeError("OpenAI 인증에 실패했습니다. 관리자가 API 키 연결 상태를 확인해야 합니다.")
+            if "unexpected argument" in tail:
+                raise RuntimeError("PPT 작업자의 실행 옵션이 현재 버전과 맞지 않습니다. 관리자에게 문의해주세요.")
+            raise RuntimeError(f"PPT 작업자가 정상적으로 완료되지 않았습니다. 오류 코드: {process.returncode}")
         exports = sorted((project / "exports").glob("*.pptx"), key=lambda p: p.stat().st_mtime)
         if not exports:
             raise RuntimeError("Slide Master가 PPTX를 생성하지 못했습니다.")
@@ -156,6 +165,7 @@ def health():
         "ok": ROOT.exists(),
         "slide_master_root": str(ROOT),
         "codex_available": shutil.which(CODEX_BIN) is not None,
+        "openai_configured": bool((os.environ.get("CODEX_API_KEY") or os.environ.get("OPENAI_API_KEY") or "").strip()),
         "engine": "slide-master-agent-worker",
     }
 

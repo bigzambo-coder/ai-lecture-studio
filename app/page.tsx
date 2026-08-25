@@ -115,6 +115,13 @@ function statusLabel(status: StageStatus) {
   return { not_started: "시작 전", drafting: "작성 중", awaiting_approval: "승인 대기", approved: "승인", revision_requested: "재검토" }[status];
 }
 
+function friendlyGenerationError(message:string) {
+  if (/401|Missing bearer|Unauthorized/i.test(message)) return "OpenAI 인증 연결을 확인하고 있습니다. 잠시 후 다시 시도해주세요.";
+  if (/unexpected argument|실행 옵션/i.test(message)) return "PPT 제작 서버를 업데이트하고 있습니다. 잠시 후 다시 시도해주세요.";
+  if (message.length > 180) return `${message.slice(0, 177)}…`;
+  return message;
+}
+
 export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [ready, setReady] = useState(false);
@@ -327,7 +334,7 @@ function Studio({ project, onStage, onGenerate }: { project: Project; onStage:(k
   const artifacts=(project.artifacts??[]).filter(a=>a.stageKey===current.key);
   const artifact=artifacts.at(-1);
   const isNext=current.key===nextStage.key;
-  async function run(){setGenerating(true);setError("");try{await onGenerate(current.key)}catch(e){setError(e instanceof Error?e.message:"생성 실패")}finally{setGenerating(false)}}
+  async function run(){setGenerating(true);setError("");try{await onGenerate(current.key)}catch(e){setError(friendlyGenerationError(e instanceof Error?e.message:"결과물 생성에 실패했습니다."))}finally{setGenerating(false)}}
   return <div className="studio">
     <aside className="stage-list"><div className="stage-project"><span className="eyebrow">PRODUCTION WORKSPACE</span><h2>{project.title}</h2><p>{project.brief.institutionName} · {project.brief.audience}</p></div><div className="stage-progress"><span>{selectedStages.filter(s=>s.status==="approved").length}/{selectedStages.length} 완료</span><i><b style={{width:`${selectedStages.filter(s=>s.status==="approved").length/selectedStages.length*100}%`}}/></i></div><ol>{selectedStages.map((s,i)=><li className={`${s.key===current.key?"current ":""}${s.status==="approved"?"done":""}`} key={s.key}><button type="button" onClick={()=>{setViewedKey(s.key);setError("")}}><span>{s.status==="approved"?"✓":String(i+1).padStart(2,"0")}</span><div><b>{s.label}</b><small>{statusLabel(s.status)}{s.version?` · v${s.version}`:""}</small></div></button></li>)}</ol></aside>
     <section className="studio-main"><header><div><span className="eyebrow">{isNext?"NEXT PRODUCTION STEP":"RESULT ARCHIVE"} · {current.key.toUpperCase()}</span><h1>{current.label}</h1><p>{isNext?`승인된 MASTER BRIEF v${project.briefSnapshots.at(-1)?.version}을 기준으로 제작합니다.`:"완료된 단계의 결과를 다시 확인하고 내려받을 수 있습니다."}</p></div><span className={`status-pill ${current.status}`}>{statusLabel(current.status)}</span></header>
