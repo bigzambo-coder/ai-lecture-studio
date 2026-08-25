@@ -130,7 +130,9 @@ export default function Home() {
     if (saved) {
       const parsed=(JSON.parse(saved) as Project[]).map((project)=>{
         const artifacts=project.artifacts??[];
-        const brief={...project.brief,notionUrl:(!project.brief.notionUrl||project.brief.notionUrl.includes("eb2c089c67df4ba8adfb8c869f74fdb5")||project.brief.notionUrl.includes("3c56eecc5c4d8055b090f160a49fad7d"))?DEFAULT_NOTION_URL:project.brief.notionUrl};
+        const savedBrief={...project.brief,notionUrl:(!project.brief.notionUrl||project.brief.notionUrl.includes("eb2c089c67df4ba8adfb8c869f74fdb5")||project.brief.notionUrl.includes("3c56eecc5c4d8055b090f160a49fad7d"))?DEFAULT_NOTION_URL:project.brief.notionUrl};
+        const currentDesign=recommendDesign(savedBrief.institutionType,savedBrief.audience,savedBrief.topic);
+        const brief={...savedBrief,designPreset:currentDesign.key,designRequest:`${currentDesign.name} · ${currentDesign.description}`};
         const visibleStages=project.stages.map(stage=>["architecture","design","final_qa"].includes(stage.key)?{...stage,selected:false}:stage);
         const visibleCurrent=visibleStages.find(stage=>stage.selected&&stage.status!=="approved")?.key??visibleStages.filter(stage=>stage.selected).at(-1)?.key??"master_brief";
         if(artifacts.length>0&&artifacts.every((artifact)=>(artifact.engineVersion??0)>=10))return {...project,brief,artifacts,stages:visibleStages,currentStage:visibleStages.some(stage=>stage.key===project.currentStage&&stage.selected)?project.currentStage:visibleCurrent};
@@ -174,13 +176,14 @@ export default function Home() {
       `AI 도구를 활용하여 ${result}에 필요한 결과물 한 가지를 완성할 수 있다.`,
       "완성한 결과물을 점검하고 자신의 상황에 맞게 수정할 수 있다.",
     ];
+    const interviewDesign=recommendDesign(active.brief.institutionType,active.brief.audience,active.brief.topic);
     patchActive((p) => ({ ...p, updatedAt: new Date().toISOString(), interviewAnswers: answers, brief: {
       ...p.brief,
       audienceLevel: answers.level ?? p.brief.audienceLevel,
       deliveryMethod: answers.practice ?? p.brief.deliveryMethod,
-      designRequest: `${p.brief.institutionType || "기관"}의 신뢰감과 ${answers.tone ?? "대상 친화적 분위기"}를 결합`,
+      designRequest: `${interviewDesign.name} · ${interviewDesign.description}`,
       designReferenceUrl:p.brief.designReferenceUrl??"",
-      designPreset:p.brief.designPreset??"auto",
+      designPreset:interviewDesign.key,
       notionUrl:p.brief.notionUrl??"",
       objectives: p.brief.objectives.length ? p.brief.objectives : inferredObjectives,
     }}));
