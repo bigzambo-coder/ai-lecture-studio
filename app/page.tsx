@@ -150,7 +150,7 @@ export default function Home() {
         const storedStages=Array.isArray(project.stages)?project.stages:makeStages(project.deliverables??["ppt","notion"]);
         const visibleStages=storedStages.map(stage=>["architecture","design","final_qa"].includes(stage.key)?{...stage,selected:false}:stage);
         const visibleCurrent=visibleStages.find(stage=>stage.selected&&stage.status!=="approved")?.key??visibleStages.filter(stage=>stage.selected).at(-1)?.key??"master_brief";
-        if(artifacts.length>0&&artifacts.every((artifact)=>(artifact.engineVersion??0)>=10))return {...project,brief,artifacts,stages:visibleStages,currentStage:visibleStages.some(stage=>stage.key===project.currentStage&&stage.selected)?project.currentStage:visibleCurrent};
+        if(artifacts.length>0&&artifacts.every((artifact)=>(artifact.engineVersion??0)>=16))return {...project,brief,artifacts,stages:visibleStages,currentStage:visibleStages.some(stage=>stage.key===project.currentStage&&stage.selected)?project.currentStage:visibleCurrent};
         const stages=visibleStages.map((stage)=>stage.key==="master_brief"?stage:{...stage,status:"not_started" as StageStatus,version:0});
         return {...project,brief,artifacts:[],stages,currentStage:stages.find((stage)=>stage.selected&&stage.key!=="master_brief")?.key??"final_qa"};
       });
@@ -243,7 +243,7 @@ export default function Home() {
     const stage=active.stages.find((s)=>s.key===key);
     const version=(stage?.version ?? 0)+1;
     let slideMasterFallback=false;
-    if(key==="ppt"){
+    if(key==="ppt"&&!active.brief.designLocked){
       try{
         const presenton=await fetch("/api/presenton",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({projectId:active.id,projectTitle:active.title,brief:active.brief})});
         if(presenton.ok){
