@@ -126,6 +126,7 @@ function friendlyGenerationError(message:string) {
 export default function Home() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [ready, setReady] = useState(false);
+  const [storageWritable, setStorageWritable] = useState(true);
   const [view, setView] = useState<View>("dashboard");
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState<MasterBrief>(emptyBrief);
@@ -134,28 +135,37 @@ export default function Home() {
   const [objectiveText, setObjectiveText] = useState("");
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORE_KEY);
-    if (saved) {
-      const parsed=(JSON.parse(saved) as Project[]).map((project)=>{
+    try {
+      const saved = localStorage.getItem(STORE_KEY);
+      if (saved) {
+      const raw=JSON.parse(saved) as unknown;
+      if(!Array.isArray(raw))throw new Error("저장 데이터가 배열 형식이 아닙니다.");
+      const parsed=(raw as Project[]).map((project)=>{
         const artifacts=project.artifacts??[];
-        const savedBrief={...project.brief,notionUrl:(!project.brief.notionUrl||project.brief.notionUrl.includes("eb2c089c67df4ba8adfb8c869f74fdb5")||project.brief.notionUrl.includes("3c56eecc5c4d8055b090f160a49fad7d"))?DEFAULT_NOTION_URL:project.brief.notionUrl};
+        const sourceBrief=project.brief??emptyBrief;
+        const savedBrief={...emptyBrief,...sourceBrief,notionUrl:(!sourceBrief.notionUrl||sourceBrief.notionUrl.includes("eb2c089c67df4ba8adfb8c869f74fdb5")||sourceBrief.notionUrl.includes("3c56eecc5c4d8055b090f160a49fad7d"))?DEFAULT_NOTION_URL:sourceBrief.notionUrl};
         const locked=Boolean(savedBrief.designLocked&&savedBrief.designPreset&&savedBrief.designPreset!=="auto");
         const currentDesign=locked?resolveDesign(savedBrief.designPreset,savedBrief.institutionType,savedBrief.audience,savedBrief.topic):recommendDesign(savedBrief.institutionType,savedBrief.audience,savedBrief.topic);
         const brief={...savedBrief,designLocked:locked,designPreset:currentDesign.key,designRequest:savedBrief.designRequest||`${currentDesign.name} · ${currentDesign.description}`};
-        const visibleStages=project.stages.map(stage=>["architecture","design","final_qa"].includes(stage.key)?{...stage,selected:false}:stage);
+        const storedStages=Array.isArray(project.stages)?project.stages:makeStages(project.deliverables??["ppt","notion"]);
+        const visibleStages=storedStages.map(stage=>["architecture","design","final_qa"].includes(stage.key)?{...stage,selected:false}:stage);
         const visibleCurrent=visibleStages.find(stage=>stage.selected&&stage.status!=="approved")?.key??visibleStages.filter(stage=>stage.selected).at(-1)?.key??"master_brief";
         if(artifacts.length>0&&artifacts.every((artifact)=>(artifact.engineVersion??0)>=10))return {...project,brief,artifacts,stages:visibleStages,currentStage:visibleStages.some(stage=>stage.key===project.currentStage&&stage.selected)?project.currentStage:visibleCurrent};
         const stages=visibleStages.map((stage)=>stage.key==="master_brief"?stage:{...stage,status:"not_started" as StageStatus,version:0});
         return {...project,brief,artifacts:[],stages,currentStage:stages.find((stage)=>stage.selected&&stage.key!=="master_brief")?.key??"final_qa"};
       });
       setProjects(parsed);
+      }
+    } catch {
+      setProjects([]);
+      setStorageWritable(false);
     }
     setReady(true);
   }, []);
 
   useEffect(() => {
-    if (ready) localStorage.setItem(STORE_KEY, JSON.stringify(projects));
-  }, [projects, ready]);
+    if (ready&&storageWritable) localStorage.setItem(STORE_KEY, JSON.stringify(projects));
+  }, [projects, ready, storageWritable]);
 
   const active = useMemo(() => projects.find((project) => project.id === activeId) ?? null, [projects, activeId]);
 
@@ -164,7 +174,7 @@ export default function Home() {
   }
 
   function beginCreate() {
-    setDraft(emptyBrief); setSelected(["ppt", "notion"]); setAnswers({}); setView("create"); setActiveId(null);
+    setStorageWritable(true); setDraft(emptyBrief); setSelected(["ppt", "notion"]); setAnswers({}); setView("create"); setActiveId(null);
   }
 
   function createProject() {
