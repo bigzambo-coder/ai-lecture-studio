@@ -82,3 +82,14 @@ OPENAI_MODEL=gpt-5.4
 ```
 
 API 키가 없어도 승인된 MASTER BRIEF를 기반으로 검증 가능한 기본 콘텐츠와 실제 파일을 생성한다. 현재 실행 환경에는 LibreOffice 렌더러가 없어 DOCX·PPTX 페이지 이미지 미리보기는 아직 연결되지 않았으며, 실제 Notion 페이지 작성은 MVP 3에서 연결한다.
+# Optional Presenton engine
+
+For higher-fidelity template-based PPTX generation, connect a self-hosted
+[Presenton](https://github.com/presenton/presenton) instance. The application
+tries Presenton first, then Slide Master, and finally the built-in PptxGenJS
+generator so presentation generation remains available during provider outages.
+
+```env
+PRESENTON_API_URL=https://your-presenton.example.com
+PRESENTON_API_KEY=sk-presenton-...
+```

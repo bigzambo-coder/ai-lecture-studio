@@ -235,6 +235,15 @@ export default function Home() {
     let slideMasterFallback=false;
     if(key==="ppt"){
       try{
+        const presenton=await fetch("/api/presenton",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({projectId:active.id,projectTitle:active.title,brief:active.brief})});
+        if(presenton.ok){
+          const deck=await presenton.json();
+          const artifact:ArtifactRecord={id:crypto.randomUUID(),stageKey:key,version,filename:`${active.title}_Presenton_v${version}.pptx`,format:"pptx",downloadUrl:deck.downloadUrl,preview:[`Presenton 오픈소스 템플릿 엔진 · ${deck.slideCount}장`,`선택 디자인 시스템 · ${resolveDesign(active.brief.designPreset,active.brief.institutionType,active.brief.audience,active.brief.topic).name}`,"편집 가능한 PPTX와 시각자료 구성 완료"],createdAt:new Date().toISOString(),aiGenerated:true,engineVersion:200};
+          patchActive((p)=>({...p,artifacts:[...(p.artifacts??[]),artifact],updatedAt:new Date().toISOString(),stages:p.stages.map(s=>s.key===key?{...s,status:"awaiting_approval",version}:s)}));
+          return;
+        }
+      }catch{/* Presenton 미설정 또는 장애 시 다음 엔진으로 자동 전환 */}
+      try{
       const start=await fetch("/api/slide-master",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({projectId:active.id,projectTitle:active.title,brief:active.brief})});
       if(start.ok){
         const queued=await start.json();let job=queued;
