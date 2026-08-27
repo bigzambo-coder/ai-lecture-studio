@@ -242,6 +242,6 @@ export async function POST(request:NextRequest){
     }else{
       const dir=path.join(process.cwd(),"storage",safe(projectId));await mkdir(dir,{recursive:true});await writeFile(path.join(dir,filename),buffer);downloadUrl=`/api/files?project=${encodeURIComponent(projectId)}&file=${encodeURIComponent(filename)}`;
     }
-const preview=stage==="notion"?["PPT 실습과 동일한 PRACTICE ID 적용","실습별 준비자료·프롬프트·완료기준·검수 체크 포함",brief.notionUrl?"지정한 Notion 페이지와 연결 준비 완료":"워크북 파일 생성 완료"]:[`기획서 유형: ${plan.key} · ${plan.name}`,`디자인: ${resolveDesign(brief.designPreset,brief.institutionType,brief.audience,brief.topic).name}`,content.summary];return NextResponse.json({artifact:{id:crypto.randomUUID(),stageKey:stage,version,filename,format,downloadUrl,notionUrl:stage==="notion"?brief.notionUrl:undefined,preview,createdAt:new Date().toISOString(),aiGenerated:ai,engineVersion:16}});
+const preview=stage==="notion"?["PPT 실습과 동일한 PRACTICE ID 적용","실습별 준비자료·프롬프트·완료기준·검수 체크 포함",brief.notionUrl?"지정한 Notion 페이지와 연결 준비 완료":"워크북 파일 생성 완료"]:[`기획서 유형: ${plan.key} · ${plan.name}`,`디자인: ${resolveDesign(brief.designPreset,brief.institutionType,brief.audience,brief.topic).name}`,content.summary];return NextResponse.json({artifact:{id:crypto.randomUUID(),stageKey:stage,version,filename,format,downloadUrl,notionUrl:stage==="notion"?brief.notionUrl:undefined,preview,createdAt:new Date().toISOString(),aiGenerated:ai,engineVersion:17}});
   }catch(error){console.error(error);return NextResponse.json({error:error instanceof Error?error.message:"결과물 생성 중 오류가 발생했습니다."},{status:500})}
 }
